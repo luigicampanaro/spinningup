@@ -3,6 +3,9 @@ import scipy.signal
 
 import torch
 import torch.nn as nn
+import sys
+sys.path.append('../../../../../../controllers/')
+from cpg_controller_hopf import CPGControllerHopf
 
 
 def combined_shape(length, shape=None):
@@ -31,6 +34,52 @@ class MLPActor(nn.Module):
     def forward(self, obs):
         # Return output from network scaled to action space limits.
         return self.act_limit * self.pi(obs)
+
+
+
+
+class MLPActor_CPG(nn.Module, CPGControllerHopf):
+
+    def __init__(self, *args, **kwargs):
+        nn.Module.__init__(self)
+        CPGControllerHopf.__init__(self, *args, **kwargs)
+
+    def forward(self, obs=None):
+        assert obs is not None, "Obs are 'None'."
+        d = self.updateControlCommands(obs)
+        v = self.sym @ self.v_short + self.fixed
+
+        if obs is not None:
+            sigma_N = self.contactFeedback(obs)
+
+            theta_dot = 2. * np.pi * ((self.Cd @ v) * (self.D @ d) + self.Od @ v) + np.sum(
+                (self.W @ v) * (self.Lambda @ self.r_old) * np.sin(
+                    self.Lambda @ self.theta_old - np.transpose(self.Lambda, (2, 0, 1)) @ self.theta_old - self.Fi @ v),
+                axis=1) - (self.SIGMA @ sigma_N) * np.cos(self.theta_old)
+            r_dot_dot = (self.A @ v) * (
+                        (self.A @ v / 4.) * ((self.Cr @ v) * (self.D @ d) + self.Or @ v - self.r_old) - self.r_dot_old)
+
+        x = self.r_old * np.cos(self.theta_old)
+        x_dot = self.r_dot_old * np.cos(self.theta_old) - self.r_old * np.sin(self.theta_old) * self.theta_dot_old
+        x_dot_dot = self.r_dot_dot_old * np.cos(self.theta_old) - 2 * self.r_dot_old * np.sin(self.theta_old) * self.theta_dot_old - self.r_old * (np.cos(self.theta_old) * self.theta_dot_old ** 2 + np.sin(self.theta_old) * self.theta_dot_dot_old)
+
+        theta = self.theta_old + (theta_dot + self.theta_dot_old) * self.dt / 2.
+        r_dot = self.r_dot_old + (self.r_dot_dot_old + r_dot_dot) * self.dt / 2.
+        r = self.r_old + (self.r_dot_old + r_dot) * self.dt / 2.
+        self.theta_dot_dot_old = (theta_dot - self.theta_dot_old) / self.dt
+
+        self.theta_old = theta
+        self.theta_dot_old = theta_dot
+        self.r_old = r
+        self.r_dot_old = r_dot
+        self.r_dot_dot_old = r_dot_dot
+
+        return self.actionsArray2Dictionary({
+            'pos': x,
+            'vel': x_dot,
+            'acc': x_dot_dot
+        })
+
 
 class MLPQFunction(nn.Module):
 
