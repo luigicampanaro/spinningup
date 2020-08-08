@@ -4,7 +4,7 @@ import scipy.signal
 import torch
 import torch.nn as nn
 import sys
-sys.path.append('../../../../../../controllers/')
+sys.path.append('../../../../../controllers/')
 from cpg_controller_hopf import CPGControllerHopf
 
 
