@@ -35,7 +35,7 @@ class MLPActor(nn.Module):
         # Return output from network scaled to action space limits.
         return self.act_limit * self.pi(obs)
 
-class Actor_CPG(nn.Module, CPGControllerHopf):
+class CPGActor(nn.Module, CPGControllerHopf):
 
     def __init__(self, *args, **kwargs):
         nn.Module.__init__(self)
@@ -125,7 +125,7 @@ if __name__ == "__main__":
     with open(path + 'fixed_tuples.json', 'r') as file:
         fixed_tuples = json.load(file)
 
-    actorCPG = Actor_CPG(network=network,
+    actorCPG = CPGActor(network=network,
                             v_names=v_names,
                             v_sym_names=v_sym_names,
                             sym_tuples=sym_tuples,
