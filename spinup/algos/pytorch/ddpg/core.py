@@ -47,7 +47,7 @@ class MLPActor_CPG(nn.Module, CPGControllerHopf):
     def forward(self, obs=None):
         assert obs is not None, "Obs are 'None'."
         d = self.updateControlCommands(obs)
-        v = self.sym.float() @ self.v_short + self.fixed.float()
+        v = self.sym @ self.v_short + self.fixed
 
         if obs is not None:
             sigma_N = self.contactFeedback(obs)
