@@ -35,10 +35,7 @@ class MLPActor(nn.Module):
         # Return output from network scaled to action space limits.
         return self.act_limit * self.pi(obs)
 
-
-
-
-class MLPActor_CPG(nn.Module, CPGControllerHopf):
+class Actor_CPG(nn.Module, CPGControllerHopf):
 
     def __init__(self, *args, **kwargs):
         nn.Module.__init__(self)
