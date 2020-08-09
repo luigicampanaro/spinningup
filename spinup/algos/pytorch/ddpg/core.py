@@ -104,6 +104,25 @@ class MLPActorCritic(nn.Module):
         with torch.no_grad():
             return self.pi(obs).numpy()
 
+class CPGActorMLPCritic(nn.Module):
+    def __init__(self,network,
+                        v_names,
+                        v_sym_names,
+                        sym_tuples,
+                        fixed_tuples,
+                        init='random',
+                         seed=None,
+                         dt=1.0 / 400.0,
+                         saveParamsDict=False,
+                        hidden_sizes=(256,256), activation=nn.ReLU):
+        super().__init__()
+
+        self.pi = CPGActor(network, v_names, v_sym_names, sym_tuples, fixed_tuples, init, seed, dt, saveParamsDict)
+        self.q = MLPQFunction(len(self.pi.OBS), len(self.pi.network), hidden_sizes, activation)
+
+    def act(self, obs):
+        with torch.no_grad():
+            return self.pi(obs)
 
 ############################################
 if __name__ == "__main__":
