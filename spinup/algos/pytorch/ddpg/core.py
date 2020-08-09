@@ -153,6 +153,6 @@ if __name__ == "__main__":
                                         'mz': 0.0},
                         'vel': 0.0}}
 
-
-    print([par for par in actorCPG.parameters()])
+    print([par.data for par in actorCPG.parameters()])
+    print([par.grad for par in actorCPG.parameters()])
     print(actorCPG(obs))
