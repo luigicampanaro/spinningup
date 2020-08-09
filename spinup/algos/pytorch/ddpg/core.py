@@ -144,14 +144,6 @@ if __name__ == "__main__":
     with open(path + 'fixed_tuples.json', 'r') as file:
         fixed_tuples = json.load(file)
 
-    actorCPG = CPGActor(network=network,
-                            v_names=v_names,
-                            v_sym_names=v_sym_names,
-                            sym_tuples=sym_tuples,
-                            fixed_tuples=fixed_tuples,
-                            init='random',
-                            saveParamsDict=False)
-
     obs = {'DRIVES': {'DRIVES': {'D': 0.5}},
              'GRF_RF': 0,
              'RF_HFE': {'applied_torques': 0.0,
@@ -173,6 +165,27 @@ if __name__ == "__main__":
                                         'mz': 0.0},
                         'vel': 0.0}}
 
-    print([par.data for par in actorCPG.parameters()])
-    print([par.grad for par in actorCPG.parameters()])
-    print(actorCPG(obs))
+    ##### Testing CPGActor #####
+    actorCPG = CPGActor(network=network,
+                            v_names=v_names,
+                            v_sym_names=v_sym_names,
+                            sym_tuples=sym_tuples,
+                            fixed_tuples=fixed_tuples,
+                            init='random',
+                            saveParamsDict=False)
+
+    print(f'actorCPG.parameters().data:\n{[par.data for par in actorCPG.parameters()]}\n\n')
+    print(f'actorCPG.parameters().grad:\n{[par.grad for par in actorCPG.parameters()]}\n\n')
+    print(f'actorCPG.forward(obs):\n{actorCPG(obs)}\n\n\n')
+
+    ##### Testing CPGActorMLPCritic #####
+    ActorCPGCriticMLP = CPGActorMLPCritic(network=network,
+                                            v_names=v_names,
+                                            v_sym_names=v_sym_names,
+                                            sym_tuples=sym_tuples,
+                                            fixed_tuples=fixed_tuples,
+                                            init='random',
+                                            saveParamsDict=False)
+
+    print(f'ActorCPGCriticMLP.act(obs):\n{ActorCPGCriticMLP.act(obs)}\n\n')
+    print(f'Display ActorCPGCriticMLP.q network:\n{ActorCPGCriticMLP.q}\n\n')
