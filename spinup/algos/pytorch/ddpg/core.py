@@ -130,7 +130,8 @@ if __name__ == "__main__":
                             v_sym_names=v_sym_names,
                             sym_tuples=sym_tuples,
                             fixed_tuples=fixed_tuples,
-                            init='random')
+                            init='random',
+                            saveParamsDict=False)
 
     obs = {'DRIVES': {'DRIVES': {'D': 0.5}},
              'GRF_RF': 0,
