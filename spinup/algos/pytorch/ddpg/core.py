@@ -52,16 +52,16 @@ class MLPActor_CPG(nn.Module, CPGControllerHopf):
         if obs is not None:
             sigma_N = self.contactFeedback(obs)
 
-            theta_dot = 2. * np.pi * ((self.Cd @ v) * (self.D @ d) + self.Od @ v) + np.sum(
-                (self.W @ v) * (self.Lambda @ self.r_old) * np.sin(
-                    self.Lambda @ self.theta_old - np.transpose(self.Lambda, (2, 0, 1)) @ self.theta_old - self.Fi @ v),
-                axis=1) - (self.SIGMA @ sigma_N) * np.cos(self.theta_old)
+            theta_dot = 2. * np.pi * ((self.Cd @ v) * (self.D @ d) + self.Od @ v) + torch.sum(
+                (self.W @ v) * (self.Lambda @ self.r_old) * torch.sin(
+                    self.Lambda @ self.theta_old - self.Lambda_transpose @ self.theta_old - self.Fi @ v),
+                dim=1, keepdim=True) - (self.SIGMA @ sigma_N) * torch.cos(self.theta_old)
             r_dot_dot = (self.A @ v) * (
                         (self.A @ v / 4.) * ((self.Cr @ v) * (self.D @ d) + self.Or @ v - self.r_old) - self.r_dot_old)
 
-        x = self.r_old * np.cos(self.theta_old)
-        x_dot = self.r_dot_old * np.cos(self.theta_old) - self.r_old * np.sin(self.theta_old) * self.theta_dot_old
-        x_dot_dot = self.r_dot_dot_old * np.cos(self.theta_old) - 2 * self.r_dot_old * np.sin(self.theta_old) * self.theta_dot_old - self.r_old * (np.cos(self.theta_old) * self.theta_dot_old ** 2 + np.sin(self.theta_old) * self.theta_dot_dot_old)
+        x = self.r_old * torch.cos(self.theta_old)
+        x_dot = self.r_dot_old * torch.cos(self.theta_old) - self.r_old * torch.sin(self.theta_old) * self.theta_dot_old
+        x_dot_dot = self.r_dot_dot_old * torch.cos(self.theta_old) - 2 * self.r_dot_old * torch.sin(self.theta_old) * self.theta_dot_old - self.r_old * (torch.cos(self.theta_old) * self.theta_dot_old ** 2 + torch.sin(self.theta_old) * self.theta_dot_dot_old)
 
         theta = self.theta_old + (theta_dot + self.theta_dot_old) * self.dt / 2.
         r_dot = self.r_dot_old + (self.r_dot_dot_old + r_dot_dot) * self.dt / 2.
