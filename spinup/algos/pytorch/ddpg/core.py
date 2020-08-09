@@ -40,7 +40,6 @@ class Actor_CPG(nn.Module, CPGControllerHopf):
     def __init__(self, *args, **kwargs):
         nn.Module.__init__(self)
         CPGControllerHopf.__init__(self, *args, **kwargs)
-
     def forward(self, obs=None):
         assert obs is not None, "Obs are 'None'."
         d = self.updateControlCommands(obs)
@@ -77,7 +76,6 @@ class Actor_CPG(nn.Module, CPGControllerHopf):
             'acc': x_dot_dot
         })
 
-
 class MLPQFunction(nn.Module):
 
     def __init__(self, obs_dim, act_dim, hidden_sizes, activation):
@@ -105,3 +103,56 @@ class MLPActorCritic(nn.Module):
     def act(self, obs):
         with torch.no_grad():
             return self.pi(obs).numpy()
+
+
+############################################
+if __name__ == "__main__":
+    import json
+    from collections import OrderedDict
+    import sys
+
+    path = '../../../../../envs/hopper_ANYmal/'
+    with open(path + 'active_joints_properties.json', 'r') as f:
+        active_joint_properties = json.load(f)
+    with open(path + 'network.json', 'r') as file:
+        network = json.load(file, object_pairs_hook=OrderedDict)
+    with open(path + 'v_names.json', 'r') as file:
+        v_names = json.load(file)
+    with open(path + 'v_sym_names.json', 'r') as file:
+        v_sym_names = json.load(file)
+    with open(path + 'sym_tuples.json', 'r') as file:
+        sym_tuples = json.load(file)
+    with open(path + 'fixed_tuples.json', 'r') as file:
+        fixed_tuples = json.load(file)
+
+    actorCPG = Actor_CPG(network=network,
+                            v_names=v_names,
+                            v_sym_names=v_sym_names,
+                            sym_tuples=sym_tuples,
+                            fixed_tuples=fixed_tuples,
+                            init='random')
+
+    obs = {'DRIVES': {'DRIVES': {'D': 0.5}},
+             'GRF_RF': 0,
+             'RF_HFE': {'applied_torques': 0.0,
+                        'pos': 0.4,
+                        'reac_forces': {'fx': 0.0,
+                                        'fy': 0.0,
+                                        'fz': 0.0,
+                                        'mx': 0.0,
+                                        'my': 0.0,
+                                        'mz': 0.0},
+                        'vel': 0.0},
+             'RF_KFE': {'applied_torques': 0.0,
+                        'pos': -0.8,
+                        'reac_forces': {'fx': 0.0,
+                                        'fy': 0.0,
+                                        'fz': 0.0,
+                                        'mx': 0.0,
+                                        'my': 0.0,
+                                        'mz': 0.0},
+                        'vel': 0.0}}
+
+
+    print([par for par in actorCPG.parameters()])
+    print(actorCPG(obs))
