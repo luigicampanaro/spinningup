@@ -71,9 +71,9 @@ class CPGActor(nn.Module, CPGControllerHopf):
         self.r_dot_dot_old = r_dot_dot
 
         return self.actionsArray2Dictionary({
-            'pos': x,
-            'vel': x_dot,
-            'acc': x_dot_dot
+            'pos': x.numpy(),
+            'vel': x_dot.numpy(),
+            'acc': x_dot_dot.numpy()
         })
 
 class MLPQFunction(nn.Module):
