@@ -65,9 +65,6 @@ for epoch in range(epochs):
     # get output from the model, given the inputs
     outputs = linearModel(batchX_torch)
 
-    print(outputs)
-    pdb.set_trace()
-
     # get loss for the predicted output
     loss = criterion(outputs, batchY_torch)
 
