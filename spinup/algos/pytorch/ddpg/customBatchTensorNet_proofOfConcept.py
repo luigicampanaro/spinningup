@@ -3,6 +3,7 @@ import torch.nn as nn
 import numpy as np
 import pdb
 import random
+from tqdm import tqdm
 
 
 class linearRegression(nn.Module):
@@ -14,8 +15,13 @@ class linearRegression(nn.Module):
         self.A = torch.tensor([1, 0], requires_grad=False, dtype=torch.float32).view(1, 2)
         self.B = torch.tensor([0, 1], requires_grad=False, dtype=torch.float32).view(1, 2)
 
+        # self.recurrent_element = torch.zeros(1, 1, requires_grad=False, dtype=torch.float32)
+
     def forward(self, obs):
-        y = (self.A @ self.params) * obs + self.B @ self.params
+        y = (self.A @ self.params) * obs + self.B @ self.params \
+            # + self.recurrent_element
+
+        # self.recurrent_element = y.detach()
         return y
 
 def miniBatch(x_array, y_array, batch_size_):
@@ -54,7 +60,7 @@ optimizer = torch.optim.Adam(linearModel.parameters(), lr=learningRate)
 batch_size = 4
 
 # Main loop
-for epoch in range(epochs):
+for epoch in tqdm(range(epochs), total=epochs):
     # Mini batches
     batchX, batchY = miniBatch(x_train, y_train, batch_size)
     batchX_torch, batchY_torch = torch.from_numpy(batchX).float(), torch.from_numpy(batchY).float()
@@ -73,7 +79,7 @@ for epoch in range(epochs):
 
     # update parameters
     optimizer.step()
-    print(f'grads: {[par.grad for par in linearModel.parameters()]}')  # To check that the parameters are recognised as part of the model
+    # print(f'grads: {[par.grad for par in linearModel.parameters()]}')  # To check that the parameters are recognised as part of the model
 print('\n\n################\n')
 print(f'parameters: {[par.data for par in linearModel.parameters()]}\n')  # To check that the parameters are recognised as part of the model
 print(f'grads: {[par.grad for par in linearModel.parameters()]}')  # To check that the parameters are recognised as part of the model
