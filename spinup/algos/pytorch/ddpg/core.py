@@ -132,17 +132,17 @@ if __name__ == "__main__":
 
     path = '../../../../../envs/hopper_ANYmal/'
     with open(path + 'active_joints_properties.json', 'r') as f:
-        active_joint_properties = json.load(f)
+        active_joint_properties = json.load(f, object_pairs_hook=OrderedDict)
     with open(path + 'network.json', 'r') as file:
         network = json.load(file, object_pairs_hook=OrderedDict)
     with open(path + 'v_names.json', 'r') as file:
-        v_names = json.load(file)
+        v_names = json.load(file, object_pairs_hook=OrderedDict)
     with open(path + 'v_sym_names.json', 'r') as file:
-        v_sym_names = json.load(file)
+        v_sym_names = json.load(file, object_pairs_hook=OrderedDict)
     with open(path + 'sym_tuples.json', 'r') as file:
-        sym_tuples = json.load(file)
+        sym_tuples = json.load(file, object_pairs_hook=OrderedDict)
     with open(path + 'fixed_tuples.json', 'r') as file:
-        fixed_tuples = json.load(file)
+        fixed_tuples = json.load(file, object_pairs_hook=OrderedDict)
 
     obs = {'DRIVES': {'DRIVES': {'D': 0.5}},
              'GRF_RF': 0,
