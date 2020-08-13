@@ -42,6 +42,7 @@ class CPGActor(nn.Module, CPGControllerHopf):
         CPGControllerHopf.__init__(self, *args, **kwargs)
     def forward(self, obs=None):
         assert obs is not None, "Obs are 'None'."
+        d = obs[:len(self.drives), 0].double()
         v = self.sym @ self.v_short + self.fixed
 
         sigma_N = self.contactFeedback(obs)
