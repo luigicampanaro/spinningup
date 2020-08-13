@@ -42,39 +42,30 @@ class CPGActor(nn.Module, CPGControllerHopf):
         CPGControllerHopf.__init__(self, *args, **kwargs)
     def forward(self, obs=None):
         assert obs is not None, "Obs are 'None'."
-        d = self.updateControlCommands(obs)
         v = self.sym @ self.v_short + self.fixed
 
-        if obs is not None:
-            sigma_N = self.contactFeedback(obs)
+        sigma_N = self.contactFeedback(obs)
 
-            theta_dot = 2. * np.pi * ((self.Cd @ v) * (self.D @ d) + self.Od @ v) + torch.sum(
-                (self.W @ v) * (self.Lambda @ self.r_old) * torch.sin(
-                    self.Lambda @ self.theta_old - self.Lambda_transpose @ self.theta_old - self.Fi @ v),
-                dim=1, keepdim=True) - (self.SIGMA @ sigma_N) * torch.cos(self.theta_old)
-            r_dot_dot = (self.A @ v) * (
-                        (self.A @ v / 4.) * ((self.Cr @ v) * (self.D @ d) + self.Or @ v - self.r_old) - self.r_dot_old)
+        theta_dot = 2. * np.pi * ((self.Cd @ v) * (self.D @ d) + self.Od @ v) + torch.sum(
+            (self.W @ v) * (self.Lambda @ self.r_old) * torch.sin(
+                self.Lambda @ self.theta_old - self.Lambda_transpose @ self.theta_old - self.Fi @ v),
+            dim=1, keepdim=True) - (self.SIGMA @ sigma_N) * torch.cos(self.theta_old)
+        r_dot_dot = (self.A @ v) * (
+                    (self.A @ v / 4.) * ((self.Cr @ v) * (self.D @ d) + self.Or @ v - self.r_old) - self.r_dot_old)
 
         x = self.r_old * torch.cos(self.theta_old)
-        x_dot = self.r_dot_old * torch.cos(self.theta_old) - self.r_old * torch.sin(self.theta_old) * self.theta_dot_old
-        x_dot_dot = self.r_dot_dot_old * torch.cos(self.theta_old) - 2 * self.r_dot_old * torch.sin(self.theta_old) * self.theta_dot_old - self.r_old * (torch.cos(self.theta_old) * self.theta_dot_old ** 2 + torch.sin(self.theta_old) * self.theta_dot_dot_old)
 
         theta = self.theta_old + (theta_dot + self.theta_dot_old) * self.dt / 2.
         r_dot = self.r_dot_old + (self.r_dot_dot_old + r_dot_dot) * self.dt / 2.
         r = self.r_old + (self.r_dot_old + r_dot) * self.dt / 2.
-        self.theta_dot_dot_old = (theta_dot - self.theta_dot_old) / self.dt
 
-        self.theta_old = theta
-        self.theta_dot_old = theta_dot
-        self.r_old = r
-        self.r_dot_old = r_dot
-        self.r_dot_dot_old = r_dot_dot
+        self.theta_old = theta.detach()
+        self.theta_dot_old = theta_dot.detach()
+        self.r_old = r.detach()
+        self.r_dot_old = r_dot.detach()
+        self.r_dot_dot_old = r_dot_dot.detach()
 
-        return self.actionsArray2Dictionary({
-            'pos': x.numpy(),
-            'vel': x_dot.numpy(),
-            'acc': x_dot_dot.numpy()
-        })
+        return x.numpy()
 
 class MLPQFunction(nn.Module):
 
