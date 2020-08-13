@@ -4,7 +4,7 @@ import torch
 from torch.optim import Adam
 import gym
 import time
-from core import CPGActorMLPCritic
+from core import CPGActorMLPCritic, combined_shape, count_vars
 import sys
 
 
@@ -14,9 +14,9 @@ class ReplayBuffer:
     """
 
     def __init__(self, obs_dim, act_dim, size):
-        self.obs_buf = np.zeros(core.combined_shape(size, obs_dim), dtype=np.float32)
-        self.obs2_buf = np.zeros(core.combined_shape(size, obs_dim), dtype=np.float32)
-        self.act_buf = np.zeros(core.combined_shape(size, act_dim), dtype=np.float32)
+        self.obs_buf = np.zeros(combined_shape(size, obs_dim), dtype=np.float32)
+        self.obs2_buf = np.zeros(combined_shape(size, obs_dim), dtype=np.float32)
+        self.act_buf = np.zeros(combined_shape(size, act_dim), dtype=np.float32)
         self.rew_buf = np.zeros(size, dtype=np.float32)
         self.done_buf = np.zeros(size, dtype=np.float32)
         self.ptr, self.size, self.max_size = 0, 0, size
@@ -142,7 +142,7 @@ def ddpg(env_fn, actor_critic=CPGActorMLPCritic, ac_kwargs=dict(), seed=0,
     act_limit = list()
     for motor in env.joint_dict.values():
         if motor['active']:
-            act_limit = motor['act_lim'] + motor['pos0']
+            act_limit.append(motor['act_lim'] + motor['pos0'])
     act_limit = sum(act_limit) / len(act_limit)
 
     # Create actor-critic module and target networks
@@ -160,7 +160,7 @@ def ddpg(env_fn, actor_critic=CPGActorMLPCritic, ac_kwargs=dict(), seed=0,
     replay_buffer = ReplayBuffer(obs_dim=obs_dim, act_dim=act_dim, size=replay_size)
 
     # Count variables (protip: try to get a feel for how different size networks behave!)
-    var_counts = tuple(core.count_vars(module) for module in [ac.pi, ac.q])
+    var_counts = tuple(count_vars(module) for module in [ac.pi, ac.q])
     logger.log('\nNumber of parameters: \t pi: %d, \t q: %d\n'%var_counts)
 
     # Set up function for computing DDPG Q-loss
@@ -245,13 +245,14 @@ def ddpg(env_fn, actor_critic=CPGActorMLPCritic, ac_kwargs=dict(), seed=0,
             logger.store(TestEpRet=ep_ret, TestEpLen=ep_len)
 
     # Prepare for interaction with environment
+    drives_dic = {'DRIVES': {'D': 0.5}}
+
     total_steps = steps_per_epoch * epochs
     start_time = time.time()
-    obs_encoded, ep_ret, ep_len = env.reset(), 0, 0
+    obs_encoded, ep_ret, ep_len = env.reset(drives_dic), 0, 0
     o = ac.pi.decodeObs(obs_encoded)
     # Main loop: collect experience in env and update/log each epoch
 
-    drives_dic = {'DRIVES': {'D': 0.5}}
     for t in range(total_steps):
         
         # Until start_steps have elapsed, randomly sample actions
@@ -319,43 +320,45 @@ def ddpg(env_fn, actor_critic=CPGActorMLPCritic, ac_kwargs=dict(), seed=0,
             logger.dump_tabular()
 
 if __name__ == '__main__':
+    import sys
     sys.path.append('../../../utils/')
     from logx import EpochLogger
     from run_utils import setup_logger_kwargs
-    from spinup.utils.run_utils import setup_logger_kwargs
-    logger_kwargs = setup_logger_kwargs(args.exp_name, args.seed)
+    from collections import OrderedDict
+    sys.path.append('../../../../../envs/hopper_ANYmal/')
+    from hopper_ANYmal_env import hopperANymal_env
+    import json
+
+
+    logger_kwargs = setup_logger_kwargs('cpg_ddpd')
 
     # ddpg(lambda : gym.make(args.env), actor_critic=core.MLPActorCritic,
     #      ac_kwargs=dict(hidden_sizes=[args.hid]*args.l),
     #      gamma=args.gamma, seed=args.seed, epochs=args.epochs,
     #      logger_kwargs=logger_kwargs)
 
-    from collections import OrderedDict
-    import sys
-    sys.path.append('../../../../../envs/hopper_ANYmal/')
-    from hopper_ANYmal_env import hopperANymal_env
-    import json
 
 
     def env_fn(active_joint_properties_):
         env = hopperANymal_env(robot_urdf_path='../../../../../urdfs/hopper_ANYmal.urdf',
                           active_joint_properties=active_joint_properties_,
                           use_fixed_base=True,
-                          visualise=True,
+                          visualise=False,
                           )
         return env
 
-    with open('active_joints_properties.json', 'r') as f:
+    path = '../../../../../envs/hopper_ANYmal/'
+    with open(path + 'active_joints_properties.json', 'r') as f:
         active_joint_properties = json.load(f, object_pairs_hook=OrderedDict)
-    with open('network.json', 'r') as file:
+    with open(path + 'network.json', 'r') as file:
         network = json.load(file, object_pairs_hook=OrderedDict)
-    with open('v_names.json', 'r') as file:
+    with open(path + 'v_names.json', 'r') as file:
         v_names = json.load(file, object_pairs_hook=OrderedDict)
-    with open('v_sym_names.json', 'r') as file:
+    with open(path + 'v_sym_names.json', 'r') as file:
         v_sym_names = json.load(file, object_pairs_hook=OrderedDict)
-    with open('sym_tuples.json', 'r') as file:
+    with open(path + 'sym_tuples.json', 'r') as file:
         sym_tuples = json.load(file, object_pairs_hook=OrderedDict)
-    with open('fixed_tuples.json', 'r') as file:
+    with open(path + 'fixed_tuples.json', 'r') as file:
         fixed_tuples = json.load(file, object_pairs_hook=OrderedDict)
 
 
