@@ -50,7 +50,8 @@ class CPGActor(nn.Module, CPGControllerHopf):
         theta_dot = 2. * np.pi * ((self.Cd @ v) * (self.D @ d) + self.Od @ v) + torch.sum(
             (self.W @ v) * (self.Lambda @ self.r_old) * torch.sin(
                 self.Lambda @ self.theta_old - self.Lambda_transpose @ self.theta_old - self.Fi @ v),
-            dim=1, keepdim=True) - (self.SIGMA @ sigma_N) * torch.cos(self.theta_old)
+            dim=1, keepdim=False) - (self.SIGMA @ sigma_N) * torch.cos(self.theta_old)
+
         r_dot_dot = (self.A @ v) * (
                     (self.A @ v / 4.) * ((self.Cr @ v) * (self.D @ d) + self.Or @ v - self.r_old) - self.r_dot_old)
 
