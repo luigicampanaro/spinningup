@@ -166,7 +166,6 @@ def ddpg(env_fn, actor_critic=CPGActorMLPCritic, ac_kwargs=dict(), seed=0,
     # Set up function for computing DDPG Q-loss
     def compute_loss_q(data):
         o, a, r, o2, d = data['obs'], data['act'], data['rew'], data['obs2'], data['done']
-
         q = ac.q(o,a)
 
         # Bellman backup for Q function
@@ -266,7 +265,7 @@ def ddpg(env_fn, actor_critic=CPGActorMLPCritic, ac_kwargs=dict(), seed=0,
             a = get_action(o, act_noise)
 
         # Step the env
-        obs_encoded, r, d, _ = env.step(ac.pi.actionsArray2Dictionary(a))
+        obs_encoded, r, d, _ = env.step(drives_dic, ac.pi.actionsArray2Dictionary(a))
         o2 = ac.pi.decodeObs(obs_encoded)
         ep_ret += r
         ep_len += 1
@@ -277,7 +276,7 @@ def ddpg(env_fn, actor_critic=CPGActorMLPCritic, ac_kwargs=dict(), seed=0,
         d = False if ep_len==max_ep_len else d
 
         # Store experience to replay buffer
-        replay_buffer.store(o, a, r, o2, d)
+        replay_buffer.store(torch.squeeze(o, dim=1), a[:, 0], r, torch.squeeze(o2, dim=1), d)
 
         # Super critical, easy to overlook step: make sure to update 
         # most recent observation!
