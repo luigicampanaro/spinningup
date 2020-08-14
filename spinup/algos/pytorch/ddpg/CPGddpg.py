@@ -230,7 +230,7 @@ def ddpg(env_fn, actor_critic=CPGActorMLPCritic, ac_kwargs=dict(), seed=0,
 
     def get_action(o, noise_scale):
         a = ac.act(torch.as_tensor(o, dtype=torch.float32))
-        a += noise_scale * np.random.randn(act_dim)
+        a += noise_scale * np.random.randn(act_dim, 1)
         return np.clip(a, -act_limit, act_limit)
 
     def test_agent():
