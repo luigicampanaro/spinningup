@@ -155,7 +155,7 @@ def ddpg(env_fn, actor_critic=CPGActorMLPCritic, ac_kwargs=dict(), seed=0,
 
     # Experience buffer
     obs_dim = ac.pi.obs_dim
-    act_dim = ac.pi.CPG_NUM
+    act_dim = [ac.pi.CPG_NUM, 2]    # position and velocity per each joint
 
     replay_buffer = ReplayBuffer(obs_dim=obs_dim, act_dim=act_dim, size=replay_size)
 
@@ -170,7 +170,8 @@ def ddpg(env_fn, actor_critic=CPGActorMLPCritic, ac_kwargs=dict(), seed=0,
 
         # Bellman backup for Q function
         with torch.no_grad():
-            q_pi_targ = ac_targ.q(o2, ac_targ.pi(o2))
+            ac_targ.pi.reset(o2)
+            q_pi_targ = ac_targ.q(o2, ac_targ.pi(o2).float())
             backup = r + gamma * (1 - d) * q_pi_targ
 
         # MSE loss against Bellman backup
@@ -184,7 +185,8 @@ def ddpg(env_fn, actor_critic=CPGActorMLPCritic, ac_kwargs=dict(), seed=0,
     # Set up function for computing DDPG pi loss
     def compute_loss_pi(data):
         o = data['obs']
-        q_pi = ac.q(o, ac.pi(o))
+        ac.pi.reset(o)
+        q_pi = ac.q(o, ac.pi(o).float())
         return -q_pi.mean()
 
     # Set up optimizers for policy and q-function
@@ -228,8 +230,8 @@ def ddpg(env_fn, actor_critic=CPGActorMLPCritic, ac_kwargs=dict(), seed=0,
                 p_targ.data.add_((1 - polyak) * p.data)
 
     def get_action(o, noise_scale):
-        a = ac.act(torch.as_tensor(o, dtype=torch.float32))
-        a += noise_scale * np.random.randn(act_dim, 1)
+        a = ac.act(o.float()).reshape(1, *act_dim)
+        a += noise_scale * np.random.randn(1, *act_dim)
         return np.clip(a, -act_limit, act_limit)
 
     def test_agent():
@@ -252,6 +254,7 @@ def ddpg(env_fn, actor_critic=CPGActorMLPCritic, ac_kwargs=dict(), seed=0,
     o = ac.pi.decodeObs(obs_encoded)
     # Main loop: collect experience in env and update/log each epoch
 
+    ac.pi.reset(o)
     for t in range(total_steps):
         
         # Until start_steps have elapsed, randomly sample actions
@@ -263,7 +266,6 @@ def ddpg(env_fn, actor_critic=CPGActorMLPCritic, ac_kwargs=dict(), seed=0,
             # TODO: Mmmmmh.... ???
             # a = env.action_space.sample()
             a = get_action(o, act_noise)
-
         # Step the env
         obs_encoded, r, d, _ = env.step(drives_dic, ac.pi.actionsArray2Dictionary(a))
         o2 = ac.pi.decodeObs(obs_encoded)
@@ -276,7 +278,7 @@ def ddpg(env_fn, actor_critic=CPGActorMLPCritic, ac_kwargs=dict(), seed=0,
         d = False if ep_len==max_ep_len else d
 
         # Store experience to replay buffer
-        replay_buffer.store(torch.squeeze(o, dim=1), a[:, 0], r, torch.squeeze(o2, dim=1), d)
+        replay_buffer.store(o, a, r, o2, d)
 
         # Super critical, easy to overlook step: make sure to update 
         # most recent observation!
@@ -293,6 +295,7 @@ def ddpg(env_fn, actor_critic=CPGActorMLPCritic, ac_kwargs=dict(), seed=0,
             for _ in range(update_every):
                 batch = replay_buffer.sample_batch(batch_size)
                 update(data=batch)
+                ac.pi.reset(o)
 
         # End of epoch handling
         if (t+1) % steps_per_epoch == 0:

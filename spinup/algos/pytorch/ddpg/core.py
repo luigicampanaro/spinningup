@@ -42,18 +42,21 @@ class CPGActor(nn.Module, CPGControllerHopf):
         CPGControllerHopf.__init__(self, *args, **kwargs)
     def forward(self, obs=None):
         assert obs is not None, "Obs are 'None'."
-        d = obs[:len(self.drives), 0].double().view(-1, 1)
+
         v = self.sym @ self.v_short + self.fixed
+        d = torch.transpose((obs @ self.obs2drives), 0, 1).double()
+        self.OBS = torch.transpose(obs @ self.obsNoDrives, 0, 1).double()
+        N_prime = self.N_M @ self.OBS
+        sigma_N = v * N_prime
 
-        sigma_N = self.contactFeedback(obs)
+        theta_dot = 2. * np.pi * ((self.Cd @ v).repeat(1, d.shape[1]) * (self.D @ d) + (self.Od @ v).repeat(1, d.shape[1])) \
+            #         + torch.sum(
+            # (self.W @ v).repeat(1, d.shape[1]) * (self.Lambda @ self.r_old) * torch.sin(
+            #     self.Lambda @ self.theta_old - self.Lambda_transpose @ self.theta_old - (self.Fi @ v).repeat(1, d.shape[1])),
+            # dim=1, keepdim=False) - (self.SIGMA @ sigma_N) * torch.cos(self.theta_old).repeat(1, self.OBS.shape[1])
 
-        theta_dot = 2. * np.pi * ((self.Cd @ v) * (self.D @ d) + self.Od @ v) + torch.sum(
-            (self.W @ v) * (self.Lambda @ self.r_old) * torch.sin(
-                self.Lambda @ self.theta_old - self.Lambda_transpose @ self.theta_old - self.Fi @ v),
-            dim=1, keepdim=False) - (self.SIGMA @ sigma_N) * torch.cos(self.theta_old)
-
-        r_dot_dot = (self.A @ v) * (
-                    (self.A @ v / 4.) * ((self.Cr @ v) * (self.D @ d) + self.Or @ v - self.r_old) - self.r_dot_old)
+        r_dot_dot = (self.A @ v).repeat(1, d.shape[1]) * (
+                    (self.A @ v / 4.).repeat(1, d.shape[1]) * ((self.Cr @ v).repeat(1, d.shape[1]) * (self.D @ d) + (self.Or @ v).repeat(1, d.shape[1]) - self.r_old) - self.r_dot_old)
 
         x = self.r_old * torch.cos(self.theta_old)
         x_dot = self.r_dot_old * np.cos(self.theta_old) - self.r_old * np.sin(self.theta_old) * self.theta_dot_old
@@ -68,7 +71,15 @@ class CPGActor(nn.Module, CPGControllerHopf):
         self.r_dot_old = r_dot.detach()
         self.r_dot_dot_old = r_dot_dot.detach()
 
-        return (torch.cat((x, x_dot), 1)).numpy()
+        x = torch.unsqueeze(x, 1)
+        x_dot = torch.unsqueeze(x_dot, 1)
+
+        output = (torch.cat((x, x_dot), 1)).permute(2, 0, 1)
+
+        # if obs.shape[0] == 100:
+        #     print(output.shape)
+        #     import pdb; pdb.set_trace()
+        return output
 
 class MLPQFunction(nn.Module):
 
@@ -77,7 +88,8 @@ class MLPQFunction(nn.Module):
         self.q = mlp([obs_dim + act_dim] + list(hidden_sizes) + [1], activation)
 
     def forward(self, obs, act):
-        q = self.q(torch.cat([obs, act], dim=-1))
+        input = torch.cat([obs, torch.flatten(act, start_dim=1)], dim=1)
+        q = self.q(input)
         return torch.squeeze(q, -1) # Critical to ensure q has right shape.
 
 class MLPActorCritic(nn.Module):
@@ -112,11 +124,11 @@ class CPGActorMLPCritic(nn.Module):
         super().__init__()
 
         self.pi = CPGActor(network, v_names, v_sym_names, sym_tuples, fixed_tuples, init, seed, dt, saveParamsDict)
-        self.q = MLPQFunction(self.pi.obs_dim, len(self.pi.network), hidden_sizes, activation)
+        self.q = MLPQFunction(self.pi.obs_dim, len(self.pi.network) * 2, hidden_sizes, activation)
 
     def act(self, obs):
         with torch.no_grad():
-            return self.pi(obs)
+            return self.pi(obs).numpy()
 
 ############################################
 if __name__ == "__main__":
