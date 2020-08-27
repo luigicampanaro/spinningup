@@ -59,7 +59,7 @@ class CPGActor(nn.Module, CPGControllerHopf):
                     (self.A @ v / 4.).repeat(1, d.shape[1]) * ((self.Cr @ v).repeat(1, d.shape[1]) * (self.D @ d) + (self.Or @ v).repeat(1, d.shape[1]) - self.r_old) - self.r_dot_old)
 
         x = self.r_old * torch.cos(self.theta_old)
-        x_dot = self.r_dot_old * np.cos(self.theta_old) - self.r_old * np.sin(self.theta_old) * self.theta_dot_old
+        x_dot = self.r_dot_old * torch.cos(self.theta_old) - self.r_old * torch.sin(self.theta_old) * self.theta_dot_old
 
         theta = self.theta_old + (theta_dot + self.theta_dot_old) * self.dt / 2.
         r_dot = self.r_dot_old + (self.r_dot_dot_old + r_dot_dot) * self.dt / 2.
