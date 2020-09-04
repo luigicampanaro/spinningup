@@ -4,8 +4,6 @@ import scipy.signal
 import torch
 import torch.nn as nn
 import sys
-sys.path.append('../../../../../controllers/')
-from cpg_controller_hopf import CPGControllerHopf
 
 
 def combined_shape(length, shape=None):
@@ -34,52 +32,6 @@ class MLPActor(nn.Module):
     def forward(self, obs):
         # Return output from network scaled to action space limits.
         return self.act_limit * self.pi(obs)
-
-class CPGActor(nn.Module, CPGControllerHopf):
-
-    def __init__(self, *args, **kwargs):
-        nn.Module.__init__(self)
-        CPGControllerHopf.__init__(self, *args, **kwargs)
-    def forward(self, obs=None):
-        assert obs is not None, "Obs are 'None'."
-
-        v = self.sym @ self.v_short + self.fixed
-        d = torch.transpose((obs @ self.obs2drives), 0, 1).double()
-        self.OBS = torch.transpose(obs @ self.obsNoDrives, 0, 1).double()
-        N_prime = self.N_M @ self.OBS
-        sigma_N = v * N_prime
-
-        theta_dot = 2. * np.pi * ((self.Cd @ v).repeat(1, d.shape[1]) * (self.D @ d) + (self.Od @ v).repeat(1, d.shape[1])) \
-            #         + torch.sum(
-            # (self.W @ v).repeat(1, d.shape[1]) * (self.Lambda @ self.r_old) * torch.sin(
-            #     self.Lambda @ self.theta_old - self.Lambda_transpose @ self.theta_old - (self.Fi @ v).repeat(1, d.shape[1])),
-            # dim=1, keepdim=False) - (self.SIGMA @ sigma_N) * torch.cos(self.theta_old).repeat(1, self.OBS.shape[1])
-
-        r_dot_dot = (self.A @ v).repeat(1, d.shape[1]) * (
-                    (self.A @ v / 4.).repeat(1, d.shape[1]) * ((self.Cr @ v).repeat(1, d.shape[1]) * (self.D @ d) + (self.Or @ v).repeat(1, d.shape[1]) - self.r_old) - self.r_dot_old)
-
-        x = self.r_old * torch.cos(self.theta_old)
-        x_dot = self.r_dot_old * torch.cos(self.theta_old) - self.r_old * torch.sin(self.theta_old) * self.theta_dot_old
-
-        theta = self.theta_old + (theta_dot + self.theta_dot_old) * self.dt / 2.
-        r_dot = self.r_dot_old + (self.r_dot_dot_old + r_dot_dot) * self.dt / 2.
-        r = self.r_old + (self.r_dot_old + r_dot) * self.dt / 2.
-
-        self.theta_old = theta.detach()
-        self.theta_dot_old = theta_dot.detach()
-        self.r_old = r.detach()
-        self.r_dot_old = r_dot.detach()
-        self.r_dot_dot_old = r_dot_dot.detach()
-
-        x = torch.unsqueeze(x, 1)
-        x_dot = torch.unsqueeze(x_dot, 1)
-
-        output = (torch.cat((x, x_dot), 1)).permute(2, 0, 1)
-
-        # if obs.shape[0] == 100:
-        #     print(output.shape)
-        #     import pdb; pdb.set_trace()
-        return output
 
 class MLPQFunction(nn.Module):
 
@@ -110,88 +62,3 @@ class MLPActorCritic(nn.Module):
         with torch.no_grad():
             return self.pi(obs).numpy()
 
-class CPGActorMLPCritic(nn.Module):
-    def __init__(self,network,
-                        v_names,
-                        v_sym_names,
-                        sym_tuples,
-                        fixed_tuples,
-                        init='random',
-                         seed=None,
-                         dt=1.0 / 400.0,
-                         saveParamsDict=False,
-                        hidden_sizes=(256,256), activation=nn.ReLU):
-        super().__init__()
-
-        self.pi = CPGActor(network, v_names, v_sym_names, sym_tuples, fixed_tuples, init, seed, dt, saveParamsDict)
-        self.q = MLPQFunction(self.pi.obs_dim, len(self.pi.network) * 2, hidden_sizes, activation)
-
-    def act(self, obs):
-        with torch.no_grad():
-            return self.pi(obs).numpy()
-
-############################################
-if __name__ == "__main__":
-    import json
-    from collections import OrderedDict
-    import sys
-
-    path = '../../../../../envs/hopper_ANYmal/'
-    with open(path + 'active_joints_properties.json', 'r') as f:
-        active_joint_properties = json.load(f, object_pairs_hook=OrderedDict)
-    with open(path + 'network.json', 'r') as file:
-        network = json.load(file, object_pairs_hook=OrderedDict)
-    with open(path + 'v_names.json', 'r') as file:
-        v_names = json.load(file, object_pairs_hook=OrderedDict)
-    with open(path + 'v_sym_names.json', 'r') as file:
-        v_sym_names = json.load(file, object_pairs_hook=OrderedDict)
-    with open(path + 'sym_tuples.json', 'r') as file:
-        sym_tuples = json.load(file, object_pairs_hook=OrderedDict)
-    with open(path + 'fixed_tuples.json', 'r') as file:
-        fixed_tuples = json.load(file, object_pairs_hook=OrderedDict)
-
-    obs = {'DRIVES': {'DRIVES': {'D': 0.5}},
-             'GRF_RF': 0,
-             'RF_HFE': {'applied_torques': 0.0,
-                        'pos': 0.4,
-                        'reac_forces': {'fx': 0.0,
-                                        'fy': 0.0,
-                                        'fz': 0.0,
-                                        'mx': 0.0,
-                                        'my': 0.0,
-                                        'mz': 0.0},
-                        'vel': 0.0},
-             'RF_KFE': {'applied_torques': 0.0,
-                        'pos': -0.8,
-                        'reac_forces': {'fx': 0.0,
-                                        'fy': 0.0,
-                                        'fz': 0.0,
-                                        'mx': 0.0,
-                                        'my': 0.0,
-                                        'mz': 0.0},
-                        'vel': 0.0}}
-
-    ##### Testing CPGActor #####
-    actorCPG = CPGActor(network=network,
-                            v_names=v_names,
-                            v_sym_names=v_sym_names,
-                            sym_tuples=sym_tuples,
-                            fixed_tuples=fixed_tuples,
-                            init='random',
-                            saveParamsDict=False)
-
-    print(f'actorCPG.parameters().data:\n{[par.data for par in actorCPG.parameters()]}\n\n')
-    print(f'actorCPG.parameters().grad:\n{[par.grad for par in actorCPG.parameters()]}\n\n')
-    print(f'actorCPG.forward(obs):\n{actorCPG(obs)}\n\n\n')
-
-    ##### Testing CPGActorMLPCritic #####
-    ActorCPGCriticMLP = CPGActorMLPCritic(network=network,
-                                            v_names=v_names,
-                                            v_sym_names=v_sym_names,
-                                            sym_tuples=sym_tuples,
-                                            fixed_tuples=fixed_tuples,
-                                            init='random',
-                                            saveParamsDict=False)
-
-    print(f'ActorCPGCriticMLP.act(obs):\n{ActorCPGCriticMLP.act(obs)}\n\n')
-    print(f'Display ActorCPGCriticMLP.q network:\n{ActorCPGCriticMLP.q}\n\n')
